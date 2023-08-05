@@ -46,6 +46,7 @@ func main() {
 
 	speaker.Play(mix)
 
+	var oldStreamer beep.StreamCloser
 	var oldCtrl *beep.Ctrl
 
 	for {
@@ -81,13 +82,16 @@ func main() {
 		if oldCtrl != nil {
 			oldCtrl.Paused = true
 			oldCtrl.Streamer = nil
+			oldStreamer.Close()
 		}
+		
 		ctrl.Paused = true
 		ctrl.Streamer = streamer
 		ctrl.Paused = false
 		speaker.Unlock()
 
 		oldCtrl = ctrl
+		oldStreamer = streamer
 	}
 }
 
