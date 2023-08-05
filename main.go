@@ -8,11 +8,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/faiface/beep"
 	"github.com/faiface/beep/mp3"
-	"github.com/faiface/beep/speaker"
+	"player/server"
 )
 
 type StreamURL struct {
@@ -30,9 +28,8 @@ var StreamURLs = []StreamURL{
 
 func main() {
 
-	// setting sample rate
-	sr := beep.SampleRate(48000)
-	if err := speaker.Init(sr, sr.N(time.Second/10)); err != nil {
+	player := server.NewPlayer()
+	if err := player.Init(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -42,15 +39,7 @@ func main() {
 		fmt.Printf("%d: %s\n", i, stream.Name)
 	}
 
-	mix := &beep.Mixer{}
-
-	speaker.Play(mix)
-
-	var oldStreamer beep.StreamCloser
-	var oldCtrl *beep.Ctrl
-
 	for {
-
 		fmt.Println("Press a number to change stations, 9 to quit")
 
 		number, err := getNext()
@@ -75,23 +64,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer streamer.Close()
-		ctrl := &beep.Ctrl{Streamer: streamer, Paused: false}
-		mix.Add(ctrl)
-		speaker.Lock()
-		if oldCtrl != nil {
-			oldCtrl.Paused = true
-			oldCtrl.Streamer = nil
-			oldStreamer.Close()
-		}
-		
-		ctrl.Paused = true
-		ctrl.Streamer = streamer
-		ctrl.Paused = false
-		speaker.Unlock()
+		player.Play(streamer)
 
-		oldCtrl = ctrl
-		oldStreamer = streamer
 	}
 }
 
