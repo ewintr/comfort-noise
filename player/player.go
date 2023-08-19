@@ -1,11 +1,18 @@
-package server
+package player
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/faiface/beep"
+	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 )
+
+type Station struct {
+	Name string
+	URL  string
+}
 
 type Player struct {
 	oldStreamer beep.StreamCloser
@@ -30,7 +37,23 @@ func (p *Player) Init() error {
 	return nil
 }
 
-func (p *Player) Play(streamer beep.StreamCloser) {
+func (p *Player) Select(station Station) error {
+	res, err := http.Get(station.URL)
+	if err != nil {
+		return err
+	}
+
+	streamer, _, err := mp3.Decode(res.Body)
+	if err != nil {
+		return err
+	}
+
+	p.PlayStream(streamer)
+
+	return nil
+}
+
+func (p *Player) PlayStream(streamer beep.StreamCloser) {
 	ctrl := &beep.Ctrl{
 		Streamer: streamer,
 	}
