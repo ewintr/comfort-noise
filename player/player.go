@@ -18,17 +18,19 @@ type Player struct {
 	oldStreamer beep.StreamCloser
 	oldCtrl     *beep.Ctrl
 	mixer       *beep.Mixer
+	sr          beep.SampleRate
 }
 
 func NewPlayer() *Player {
 	return &Player{
 		mixer: &beep.Mixer{},
+		sr:    beep.SampleRate(48000),
 	}
 }
 
 func (p *Player) Init() error {
-	sr := beep.SampleRate(48000)
-	if err := speaker.Init(sr, sr.N(time.Second/10)); err != nil {
+
+	if err := speaker.Init(p.sr, p.sr.N(time.Second/10)); err != nil {
 		return err
 	}
 
@@ -43,12 +45,14 @@ func (p *Player) Select(station Station) error {
 		return err
 	}
 
-	streamer, _, err := mp3.Decode(res.Body)
+	streamer, format, err := mp3.Decode(res.Body)
 	if err != nil {
 		return err
 	}
 
-	p.PlayStream(streamer)
+	resampled := Resample(4, format.SampleRate, p.sr, streamer)
+
+	p.PlayStream(resampled)
 
 	return nil
 }
