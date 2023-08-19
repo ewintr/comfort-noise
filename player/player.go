@@ -1,6 +1,7 @@
 package player
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -14,17 +15,27 @@ type Station struct {
 	URL  string
 }
 
+type Status struct {
+	Playing  bool
+	Station  string
+	Channels []string
+}
+
 type Player struct {
+	stations    []Station
+	current     int
 	oldStreamer beep.StreamCloser
 	oldCtrl     *beep.Ctrl
 	mixer       *beep.Mixer
 	sr          beep.SampleRate
 }
 
-func NewPlayer() *Player {
+func NewPlayer(stations []Station) *Player {
 	return &Player{
-		mixer: &beep.Mixer{},
-		sr:    beep.SampleRate(48000),
+		stations: stations,
+		current:  -1,
+		mixer:    &beep.Mixer{},
+		sr:       beep.SampleRate(48000),
 	}
 }
 
@@ -39,8 +50,12 @@ func (p *Player) Init() error {
 	return nil
 }
 
-func (p *Player) Select(station Station) error {
-	res, err := http.Get(station.URL)
+func (p *Player) Select(channel int) error {
+	if channel < 0 || channel >= len(p.stations) {
+		return fmt.Errorf("unknown channel: %d", channel)
+	}
+
+	res, err := http.Get(p.stations[channel].URL)
 	if err != nil {
 		return err
 	}
@@ -53,6 +68,7 @@ func (p *Player) Select(station Station) error {
 	resampled := Resample(4, format.SampleRate, p.sr, streamer)
 
 	p.PlayStream(resampled)
+	p.current = channel
 
 	return nil
 }
@@ -79,4 +95,33 @@ func (p *Player) PlayStream(streamer beep.StreamCloser) {
 
 	p.oldCtrl = ctrl
 	p.oldStreamer = streamer
+}
+
+func (p *Player) Stop() {
+	speaker.Lock()
+	if p.oldCtrl != nil {
+		p.oldCtrl.Paused = true
+		p.oldCtrl.Streamer = nil
+		p.oldStreamer.Close()
+	}
+	speaker.Unlock()
+
+	p.current = -1
+}
+
+func (p *Player) Status() Status {
+	channels := make([]string, len(p.stations))
+	for i, stat := range p.stations {
+		channels[i] = stat.Name
+	}
+
+	if p.current < 0 || p.current >= len(p.stations) {
+		return Status{Channels: channels}
+	}
+
+	return Status{
+		Playing:  true,
+		Station:  p.stations[p.current].Name,
+		Channels: channels,
+	}
 }
